@@ -5,25 +5,23 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { FloatingHearts } from "@/components/floating-hearts";
 import { Button } from "@/components/ui/button";
-import ValentineQr from "@/components/ValentineQr";
 
 export default function ScannerPage() {
   const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
+  const [gridPatterns, setGridPatterns] = useState<string[]>([]); // Store random classes
 
-  // Stable array for QR pattern to avoid hydration mismatch
-  const [pattern, setPattern] = useState<boolean[]>([]);
-
+  // Generate random patterns only on client mount
   useEffect(() => {
-    // Generate once on client-side
-    const generatedPattern = Array.from({ length: 64 }, () => Math.random() > 0.5);
-    setPattern(generatedPattern);
-  }, []);
+    const patterns = Array.from({ length: 64 }).map(() =>
+      Math.random() > 0.5 ? "bg-rose-600" : "bg-transparent"
+    );
+    setGridPatterns(patterns);
+  }, []); // Empty dependency: runs once on client
 
   const handleScan = () => {
     setIsScanning(true);
-
     // Simulate scanning process
     setTimeout(() => {
       setScanComplete(true);
@@ -34,12 +32,8 @@ export default function ScannerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-red-50 flex flex-col items-center justify-center relative overflow-hidden px-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-red-50 flex items-center justify-center relative overflow-hidden px-4">
       <FloatingHearts />
-
-      <div className="z-10 mb-12">
-        <ValentineQr /> {/* QR Code Component shown first */}
-      </div>
 
       <div className="text-center z-10 max-w-md mx-auto">
         <motion.div
@@ -89,17 +83,18 @@ export default function ScannerPage() {
                 </motion.div>
               ) : (
                 <div className="grid grid-cols-8 gap-1 w-full h-full p-4">
-                  {pattern.map((isActive, i) => (
+                  {Array.from({ length: 64 }).map((_, i) => (
                     <motion.div
                       key={i}
-                      className={`rounded-sm ${isActive ? "bg-rose-600" : "bg-transparent"}`}
+                      // Use state for class (falls back to transparent on server)
+                      className={`rounded-sm ${gridPatterns[i] || "bg-transparent"}`}
                       animate={
                         isScanning
                           ? {
                               backgroundColor: [
-                                isActive ? "#e11d48" : "transparent",
-                                isActive ? "#be185d" : "transparent",
-                                isActive ? "#e11d48" : "transparent",
+                                Math.random() > 0.5 ? "#e11d48" : "transparent",
+                                Math.random() > 0.5 ? "#be185d" : "transparent",
+                                Math.random() > 0.5 ? "#e11d48" : "transparent",
                               ],
                             }
                           : {}
