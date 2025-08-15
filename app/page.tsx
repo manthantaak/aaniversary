@@ -1,65 +1,49 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
-import { FloatingHearts } from "@/components/floating-hearts"
-import { Button } from "@/components/ui/button"
-
-// Helper to create a deterministic boolean grid based on a seed.
-// This avoids Math.random() during render and ensures stable SSR/CSR markup.
-function makeGrid(seed: number, size = 64) {
-  // Simple xorshift32 for reproducible pseudo-randoms
-  let x = seed || 123456789
-  const rand = () => {
-    x ^= x << 13
-    x ^= x >>> 17
-    x ^= x << 5
-    // normalize to [0,1)
-    return ((x >>> 0) % 1_000_000) / 1_000_000
-  }
-  const arr: boolean[] = []
-  for (let i = 0; i < size; i++) {
-    arr.push(rand() > 0.5)
-  }
-  return arr
-}
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { FloatingHearts } from "@/components/floating-hearts";
+import { Button } from "@/components/ui/button";
+import ValentineQr from "@/components/ValentineQr";
 
 export default function ScannerPage() {
-  const router = useRouter()
-  const [isMounted, setIsMounted] = useState(false)
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanComplete, setScanComplete] = useState(false)
+  const router = useRouter();
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanComplete, setScanComplete] = useState(false);
 
-  // Mount gate ensures SSR and first client render are identical.
-  useEffect(() => setIsMounted(true), [])
+  // Stable array for QR pattern to avoid hydration mismatch
+  const [pattern, setPattern] = useState<boolean[]>([]);
 
-  // Generate a deterministic pattern once after mount.
-  // Until mounted, render a fixed, safe default (no randomness).
-  const basePattern = useMemo(() => {
-    if (!isMounted) return Array.from({ length: 64 }, (_, i) => i % 2 === 0) // checkerboard placeholder
-    // Seed with a fixed constant + maybe route-based salt for variety without per-render randomness.
-    return makeGrid(0xC0FFEE)
-  }, [isMounted])
+  useEffect(() => {
+    // Generate once on client-side
+    const generatedPattern = Array.from({ length: 64 }, () => Math.random() > 0.5);
+    setPattern(generatedPattern);
+  }, []);
 
   const handleScan = () => {
-    setIsScanning(true)
+    setIsScanning(true);
+
     // Simulate scanning process
     setTimeout(() => {
-      setScanComplete(true)
+      setScanComplete(true);
       setTimeout(() => {
-        router.push("/welcome")
-      }, 1000)
-    }, 3000)
-  }
+        router.push("/welcome");
+      }, 1000);
+    }, 3000);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-red-50 flex items-center justify-center relative overflow-hidden px-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-red-50 flex flex-col items-center justify-center relative overflow-hidden px-4">
       <FloatingHearts />
+
+      <div className="z-10 mb-12">
+        <ValentineQr /> {/* QR Code Component shown first */}
+      </div>
 
       <div className="text-center z-10 max-w-md mx-auto">
         <motion.div
-          initial={false} // keep SSR/CSR identical on first paint
+          initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
           className="mb-8"
@@ -73,7 +57,7 @@ export default function ScannerPage() {
         </motion.div>
 
         <motion.div
-          initial={false} // avoid differing initial
+          initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.5 }}
           className="relative"
@@ -84,10 +68,8 @@ export default function ScannerPage() {
             <AnimatePresence>
               {isScanning && (
                 <motion.div
-                  key="scan-line"
                   initial={{ y: -100 }}
                   animate={{ y: 300 }}
-                  exit={{ opacity: 0 }}
                   transition={{
                     duration: 2,
                     repeat: Number.POSITIVE_INFINITY,
@@ -102,36 +84,27 @@ export default function ScannerPage() {
             {/* QR Code Pattern */}
             <div className="absolute inset-4 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center">
               {scanComplete ? (
-                <motion.div
-                  initial={false}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-6xl"
-                >
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-6xl">
                   💖
                 </motion.div>
               ) : (
                 <div className="grid grid-cols-8 gap-1 w-full h-full p-4">
-                  {basePattern.map((isFilled, i) => (
+                  {pattern.map((isActive, i) => (
                     <motion.div
                       key={i}
-                      // Keep the class stable during hydration
-                      className={`rounded-sm ${isFilled ? "bg-rose-600" : "bg-transparent"}`}
-                      initial={false}
-                      // Animate only after mount to avoid SSR/CSR mismatch
+                      className={`rounded-sm ${isActive ? "bg-rose-600" : "bg-transparent"}`}
                       animate={
-                        isMounted && isScanning
+                        isScanning
                           ? {
-                              // Animate via opacity/brightness for stability; avoid recomputing random colors per render
-                              opacity: [1, isFilled ? 1 : 0.6, 1],
-                              filter: ["brightness(1)", "brightness(1.2)", "brightness(1)"],
+                              backgroundColor: [
+                                isActive ? "#e11d48" : "transparent",
+                                isActive ? "#be185d" : "transparent",
+                                isActive ? "#e11d48" : "transparent",
+                              ],
                             }
                           : {}
                       }
-                      transition={{
-                        duration: 0.5,
-                        repeat: isMounted && isScanning ? Number.POSITIVE_INFINITY : 0,
-                      }}
+                      transition={{ duration: 0.5, repeat: Number.POSITIVE_INFINITY }}
                     />
                   ))}
                 </div>
@@ -156,7 +129,7 @@ export default function ScannerPage() {
 
           {isScanning && (
             <motion.p
-              initial={false}
+              initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="text-rose-500 font-handwriting mt-4 text-sm sm:text-base"
             >
@@ -166,5 +139,5 @@ export default function ScannerPage() {
         </motion.div>
       </div>
     </div>
-  )
+  );
 }
